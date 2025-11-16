@@ -5,8 +5,8 @@ OUTPUT_ROOT="./results/dreambooth-sdxl"
 
 SEED=42
 BATCH_SIZE=1
-NUM_TRAIN_EPOCHS=200
-CKPT_STEP=500
+NUM_TRAIN_EPOCHS=100
+CKPT_STEP=100
 LR=1e-4
 
 accelerate launch train_text_to_image_lora_sdxl.py \
@@ -25,6 +25,6 @@ accelerate launch train_text_to_image_lora_sdxl.py \
   --mixed_precision="fp16" \
   --seed=$SEED \
   --output_dir="$OUTPUT_ROOT/$(basename $DATA_ROOT)" \
-  --validation_epochs 10 \
-  --validation_prompt="A picture of sks monster standing on the moon" \
+  --validation_epochs 50 \
+  --validation_prompt="A sks monster jumping on the moon" \
   --report_to="wandb" \

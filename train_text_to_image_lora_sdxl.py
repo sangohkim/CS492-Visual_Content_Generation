@@ -1265,10 +1265,6 @@ def main(args):
 
                 images = log_validation(pipeline, args, accelerator, epoch)
 
-                # save images
-                for i, image in enumerate(images):
-                    image.save(os.path.join(args.output_dir, f"validation_epoch_{epoch}_image_{i}.png"))
-
                 del pipeline
                 torch.cuda.empty_cache()
 
