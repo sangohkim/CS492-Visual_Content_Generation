@@ -3,6 +3,7 @@ diffusers*
 results*
 wandb*
 class_images*
+inference_outputs*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
