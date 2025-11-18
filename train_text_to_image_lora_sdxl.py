@@ -489,6 +489,24 @@ def parse_args(input_args=None):
         ],
         help="The image interpolation method to use for resizing images.",
     )
+    parser.add_argument(
+        "--class_data_dir",
+        type=str,
+        default=None,
+        help="Directory with class images for prior preservation.",
+    )
+    parser.add_argument(
+        "--prior_loss_weight",
+        type=float,
+        default=1.0,
+        help="Weight of the prior preservation loss.",
+    )
+    parser.add_argument(
+        "--class_prompt",
+        type=str,
+        default=None,
+        help="Class prompt used to generate prior preservation images.",
+    )
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -982,6 +1000,33 @@ def main(args):
         # Set the training transforms
         train_dataset = dataset["train"].with_transform(preprocess_train, output_all_columns=True)
 
+    # Load class dataset (prior preservation)
+    if args.class_data_dir is not None:
+        class_data_files = {"train": os.path.join(args.class_data_dir, "**")}
+        class_dataset = load_dataset(
+            "imagefolder",
+            data_files=class_data_files,
+            cache_dir=args.cache_dir,
+        )
+        class_dataset = class_dataset["train"].with_transform(preprocess_train, output_all_columns=True)
+
+        class_dataloader = torch.utils.data.DataLoader(
+            class_dataset,
+            shuffle=True,
+            collate_fn=lambda examples: {
+                "pixel_values": torch.stack([example["pixel_values"] for example in examples]).to(memory_format=torch.contiguous_format).float(),
+                "input_ids_one": torch.stack([example["input_ids_one"] for example in examples]),
+                "input_ids_two": torch.stack([example["input_ids_two"] for example in examples]),
+                "original_sizes": [example["original_sizes"] for example in examples],
+                "crop_top_lefts": [example["crop_top_lefts"] for example in examples],
+            },
+            batch_size=args.train_batch_size,
+            num_workers=args.dataloader_num_workers,
+        )
+        class_data_iter = iter(class_dataloader)
+    else:
+        class_dataloader = None
+
     def collate_fn(examples):
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
@@ -1103,6 +1148,14 @@ def main(args):
             text_encoder_two.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
+            # Get class batch
+            if class_dataloader is not None:
+                try:
+                    class_batch = next(class_data_iter)
+                except StopIteration:
+                    class_data_iter = iter(class_dataloader)
+                    class_batch = next(class_data_iter)
+            
             with accelerator.accumulate(unet):
                 # Convert images to latent space
                 if args.pretrained_vae_model_name_or_path is not None:
@@ -1114,6 +1167,17 @@ def main(args):
                 model_input = model_input * vae.config.scaling_factor
                 if args.pretrained_vae_model_name_or_path is None:
                     model_input = model_input.to(weight_dtype)
+
+                # --- prior(class) batch ---
+                if class_dataloader is not None:
+                    if args.pretrained_vae_model_name_or_path is not None:
+                        class_pixel_values = class_batch["pixel_values"].to(device=accelerator.device, dtype=weight_dtype)
+                    else:
+                        class_pixel_values = class_batch["pixel_values"].to(device=accelerator.device)
+                    class_latents = vae.encode(class_pixel_values).latent_dist.sample()
+                    class_latents = class_latents * vae.config.scaling_factor
+                    if args.pretrained_vae_model_name_or_path is None:
+                        class_latents = class_latents.to(weight_dtype)
 
                 # Sample noise that we'll add to the latents
                 noise = torch.randn_like(model_input)
@@ -1176,8 +1240,9 @@ def main(args):
                 else:
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
+                # ===== Instance loss =====
                 if args.snr_gamma is None:
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                    instance_loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
                 else:
                     # Compute loss-weights as per Section 3.4 of https://huggingface.co/papers/2303.09556.
                     # Since we predict the noise instead of x_0, the original formulation is slightly changed.
@@ -1191,18 +1256,77 @@ def main(args):
                     elif noise_scheduler.config.prediction_type == "v_prediction":
                         mse_loss_weights = mse_loss_weights / (snr + 1)
 
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
-                    loss = loss.mean(dim=list(range(1, len(loss.shape)))) * mse_loss_weights
-                    loss = loss.mean()
+                    instance_loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+                    instance_loss = instance_loss.mean(dim=list(range(1, len(instance_loss.shape)))) * mse_loss_weights
+                    instance_loss = instance_loss.mean()
+
+                total_loss = instance_loss
+
+                # ===== Prior preservation loss =====
+                if class_dataloader is not None:
+                    # sample class timesteps
+                    c_bsz = class_latents.shape[0]
+                    class_noise = torch.randn_like(class_latents)
+                    class_t = torch.randint(
+                        0, noise_scheduler.config.num_train_timesteps,
+                        (c_bsz,), device=accelerator.device
+                    )
+                    class_t = class_t.long()
+                    class_noisy_latents = noise_scheduler.add_noise(class_latents, class_noise, class_t)
+
+                    # encode class prompts
+                    class_input_ids_one = class_batch["input_ids_one"].to(accelerator.device)
+                    class_input_ids_two = class_batch["input_ids_two"].to(accelerator.device)
+                    class_prompt_embeds, class_pooled = encode_prompt(
+                        text_encoders=[text_encoder_one, text_encoder_two],
+                        tokenizers=None,
+                        prompt=None,
+                        text_input_ids_list=[class_input_ids_one, class_input_ids_two],
+                    )
+
+                    # class conds
+                    def compute_time_ids(original_size, crops_coords_top_left):
+                        target_size = (args.resolution, args.resolution)
+                        add_time_ids = list(original_size + crops_coords_top_left + target_size)
+                        add_time_ids = torch.tensor([add_time_ids])
+                        add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
+                        return add_time_ids
+
+                    class_time_ids = torch.cat([
+                        compute_time_ids(s, c)
+                        for s, c in zip(class_batch["original_sizes"], class_batch["crop_top_lefts"])
+                    ])
+                    class_conds = {"time_ids": class_time_ids, "text_embeds": class_pooled}
+
+                    # forward unet
+                    class_pred = unet(
+                        class_noisy_latents,
+                        class_t,
+                        class_prompt_embeds,
+                        added_cond_kwargs=class_conds,
+                        return_dict=False,
+                    )[0]
+
+                    if noise_scheduler.config.prediction_type == "epsilon":
+                        class_target = class_noise
+                    else:
+                        class_target = noise_scheduler.get_velocity(class_latents, class_noise, class_t)
+
+                    prior_loss = F.mse_loss(class_pred.float(), class_target.float(), reduction="mean")
+                    total_loss = total_loss + args.prior_loss_weight * prior_loss
+                else:
+                    prior_loss = torch.tensor(0.0, device=accelerator.device)
+
                 if args.debug_loss and "filenames" in batch:
                     for fname in batch["filenames"]:
-                        accelerator.log({"loss_for_" + fname: loss}, step=global_step)
+                        accelerator.log({"loss_for_" + fname: total_loss}, step=global_step)
+                
                 # Gather the losses across all processes for logging (if we use distributed training).
-                avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
+                avg_loss = accelerator.gather(total_loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
 
                 # Backpropagate
-                accelerator.backward(loss)
+                accelerator.backward(total_loss)
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(params_to_optimize, args.max_grad_norm)
                 optimizer.step()
@@ -1213,7 +1337,11 @@ def main(args):
             if accelerator.sync_gradients:
                 progress_bar.update(1)
                 global_step += 1
-                accelerator.log({"train_loss": train_loss}, step=global_step)
+                log_dict = {"train_loss": train_loss}
+                if class_dataloader is not None:
+                    log_dict["instance_loss"] = accelerator.gather(instance_loss.repeat(args.train_batch_size)).mean().item()
+                    log_dict["prior_loss"] = accelerator.gather(prior_loss.repeat(args.train_batch_size)).mean().item()
+                accelerator.log(log_dict, step=global_step)
                 train_loss = 0.0
 
                 # DeepSpeed requires saving weights on every device; saving weights only on the main process would cause issues.
@@ -1243,7 +1371,10 @@ def main(args):
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
 
-            logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+            logs = {"step_loss": total_loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+            if class_dataloader is not None:
+                logs["instance_loss"] = instance_loss.detach().item()
+                logs["prior_loss"] = prior_loss.detach().item()
             progress_bar.set_postfix(**logs)
 
             if global_step >= args.max_train_steps:
