@@ -17,6 +17,7 @@ BATCH_SIZE=1
 NUM_TRAIN_EPOCHS=200
 CKPT_STEP=100
 LR=5e-5
+GRAD_ACC_STEPS=4
 
 # 검증 설정
 VALIDATION_PROMPT="A sks monster jumping on the moon"
@@ -34,6 +35,7 @@ accelerate launch train_text_to_image_lora_sdxl.py \
   --learning_rate=$LR \
   --lr_scheduler="constant" \
   --lr_warmup_steps=0 \
+  --gradient_accumulation_steps=$GRAD_ACC_STEPS \
   --mixed_precision="fp16" \
   --seed=$SEED \
   --output_dir="$OUTPUT_ROOT/$(basename $INSTANCE_DIR)" \
