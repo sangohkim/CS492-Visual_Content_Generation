@@ -2,6 +2,7 @@ dataset*
 diffusers*
 results*
 wandb*
+class_images*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

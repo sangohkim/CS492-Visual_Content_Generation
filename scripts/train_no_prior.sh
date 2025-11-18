@@ -14,7 +14,7 @@ OUTPUT_ROOT="./results/dreambooth-lora-sdxl"
 # 학습 하이퍼파라미터
 SEED=42
 BATCH_SIZE=1
-NUM_TRAIN_EPOCHS=1000
+NUM_TRAIN_EPOCHS=200
 CKPT_STEP=100
 LR=5e-5
 
