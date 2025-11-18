@@ -23,7 +23,7 @@ LR=5e-5
 PRIOR_LOSS_WEIGHT=1.0  # 0.5~1.0 사이에서 조절 가능
 
 # 검증 설정
-VALIDATION_PROMPT="A sks monster jumping on the moon"
+VALIDATION_PROMPT="A sks toy jumping on the moon"
 VALIDATION_EPOCHS=10
 
 accelerate launch train_text_to_image_lora_sdxl.py \
@@ -31,6 +31,7 @@ accelerate launch train_text_to_image_lora_sdxl.py \
   --pretrained_vae_model_name_or_path=$VAE_NAME \
   --caption_column="text" \
   --resolution=1024 \
+  --random_flip \
   --train_data_dir=$INSTANCE_DIR \
   --class_data_dir=$CLASS_DIR \
   --prior_loss_weight=$PRIOR_LOSS_WEIGHT \
