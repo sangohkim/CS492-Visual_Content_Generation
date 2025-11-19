@@ -8,7 +8,7 @@ This script generates images using trained textual inversion embeddings
 import argparse
 import torch
 from pathlib import Path
-from diffusers import DiffusionPipeline
+from diffusers import DiffusionPipeline, StableDiffusionXLPipeline
 
 
 def parse_args():
@@ -23,13 +23,13 @@ def parse_args():
         "--learned_embeds_path",
         type=str,
         required=True,
-        help="Path to the learned embeddings file (learned_embeds.safetensors).",
+        help="Path to the learned embeddings file for text_encoder (learned_embeds.safetensors).",
     )
     parser.add_argument(
         "--learned_embeds_2_path",
         type=str,
-        default=None,
-        help="Path to the second learned embeddings file (learned_embeds_2.safetensors) for SDXL.",
+        required=True,
+        help="Path to the second learned embeddings file for text_encoder_2 (learned_embeds_2.safetensors) for SDXL.",
     )
     parser.add_argument(
         "--placeholder_token",
@@ -103,6 +103,18 @@ def parse_args():
         default=True,
         help="Whether to use safetensors format.",
     )
+    parser.add_argument(
+        "--token_1",
+        type=str,
+        default=None,
+        help="Optional: different token name for text_encoder. If not provided, uses placeholder_token.",
+    )
+    parser.add_argument(
+        "--token_2",
+        type=str,
+        default=None,
+        help="Optional: different token name for text_encoder_2. If not provided, uses placeholder_token.",
+    )
     
     args = parser.parse_args()
     return args
@@ -119,9 +131,8 @@ def main():
     print("Starting Image Generation")
     print("=" * 50)
     print(f"Pretrained Model: {args.pretrained_model_name_or_path}")
-    print(f"Learned Embeddings: {args.learned_embeds_path}")
-    if args.learned_embeds_2_path:
-        print(f"Learned Embeddings 2: {args.learned_embeds_2_path}")
+    print(f"Learned Embeddings (text_encoder): {args.learned_embeds_path}")
+    print(f"Learned Embeddings (text_encoder_2): {args.learned_embeds_2_path}")
     print(f"Output Directory: {args.output_dir}")
     print(f"Prompt: {args.prompt}")
     print(f"Number of Images: {args.num_images}")
@@ -129,29 +140,48 @@ def main():
     print()
     
     # Load the pipeline
-    print("Loading model...")
-    pipe = DiffusionPipeline.from_pretrained(
+    print("Loading SDXL pipeline...")
+    pipe = StableDiffusionXLPipeline.from_pretrained(
         args.pretrained_model_name_or_path,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
         variant=args.variant,
         use_safetensors=args.use_safetensors
     ).to("cuda")
     
-    # Load the learned embeddings
+    # Load the learned embeddings for both text encoders
     print("Loading learned embeddings...")
     
-    try:
-        pipe.load_textual_inversion(args.learned_embeds_path, token=args.placeholder_token)
-        print(f"✓ Loaded embeddings from {Path(args.learned_embeds_path).name}")
-    except Exception as e:
-        print(f"✗ Warning: Could not load first embeddings: {e}")
+    # Determine token names
+    token_1 = args.token_1 if args.token_1 else args.placeholder_token
+    token_2 = args.token_2 if args.token_2 else args.placeholder_token
     
-    if args.learned_embeds_2_path:
-        try:
-            pipe.load_textual_inversion(args.learned_embeds_2_path, token=args.placeholder_token)
-            print(f"✓ Loaded embeddings from {Path(args.learned_embeds_2_path).name}")
-        except Exception as e:
-            print(f"✗ Warning: Could not load second embeddings: {e}")
+    # Load embeddings for text_encoder
+    try:
+        pipe.load_textual_inversion(
+            args.learned_embeds_path, 
+            token=token_1,
+            text_encoder=pipe.text_encoder,
+            tokenizer=pipe.tokenizer,
+            dtype=torch.bfloat16
+        )
+        print(f"✓ Loaded text_encoder embeddings from {Path(args.learned_embeds_path).name} with token '{token_1}'")
+    except Exception as e:
+        print(f"✗ Error: Could not load text_encoder embeddings: {e}")
+        return
+    
+    # Load embeddings for text_encoder_2
+    try:
+        pipe.load_textual_inversion(
+            args.learned_embeds_2_path,
+            token=token_2,
+            text_encoder=pipe.text_encoder_2,
+            tokenizer=pipe.tokenizer_2,
+            dtype=torch.bfloat16
+        )
+        print(f"✓ Loaded text_encoder_2 embeddings from {Path(args.learned_embeds_2_path).name} with token '{token_2}'")
+    except Exception as e:
+        print(f"✗ Error: Could not load text_encoder_2 embeddings: {e}")
+        return
     
     print(f"\nGenerating {args.num_images} images...")
     print(f"Prompt: {args.prompt}")
