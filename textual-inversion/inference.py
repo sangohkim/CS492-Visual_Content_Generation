@@ -62,6 +62,12 @@ def parse_args():
         help="Number of images to generate.",
     )
     parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=1,
+        help="Batch size for inference. Images will be generated in batches.",
+    )
+    parser.add_argument(
         "--num_inference_steps",
         type=int,
         default=50,
@@ -136,6 +142,7 @@ def main():
     print(f"Output Directory: {args.output_dir}")
     print(f"Prompt: {args.prompt}")
     print(f"Number of Images: {args.num_images}")
+    print(f"Batch Size: {args.batch_size}")
     print("=" * 50)
     print()
     
@@ -195,11 +202,18 @@ def main():
         generator = torch.Generator(device="cuda").manual_seed(args.seed)
         print(f"Using seed: {args.seed}")
     
-    # Generate images
-    for i in range(args.num_images):
-        print(f"Generating image {i+1}/{args.num_images}...")
+    # Generate images in batches
+    total_generated = 0
+    batch_count = 0
+    
+    while total_generated < args.num_images:
+        # Calculate current batch size
+        current_batch_size = min(args.batch_size, args.num_images - total_generated)
+        batch_count += 1
         
-        # Generate single image
+        print(f"Generating batch {batch_count} with {current_batch_size} image(s)...")
+        
+        # Generate batch of images
         output = pipe(
             prompt=args.prompt,
             negative_prompt=args.negative_prompt,
@@ -207,19 +221,27 @@ def main():
             guidance_scale=args.guidance_scale,
             height=args.height,
             width=args.width,
+            num_images_per_prompt=current_batch_size,
             generator=generator,
         )
         
-        image = output.images[0]
+        # Save each image in the batch
+        for j, image in enumerate(output.images):
+            i = total_generated + j
+            if args.seed is not None:
+                output_path = output_dir / f"generated_{i:03d}_seed_{args.seed}.png"
+            else:
+                output_path = output_dir / f"generated_{i:03d}.png"
+            
+            image.save(output_path)
+            print(f"  ✓ Saved: {output_path}")
         
-        # Save image
-        if args.seed is not None:
-            output_path = output_dir / f"generated_{i:03d}_seed_{args.seed}.png"
-        else:
-            output_path = output_dir / f"generated_{i:03d}.png"
+        total_generated += current_batch_size
         
-        image.save(output_path)
-        print(f"  ✓ Saved: {output_path}")
+        # Clear GPU cache after each batch
+        del output
+        torch.cuda.empty_cache()
+        print(f"  ✓ Cleared GPU cache")
     
     print()
     print("=" * 50)
