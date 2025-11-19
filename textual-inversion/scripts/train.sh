@@ -8,21 +8,21 @@ PRETRAINED_MODEL="stabilityai/stable-diffusion-xl-base-1.0"
 TRAIN_DATA_DIR="./dataset/monster_toy/train"
 OUTPUT_DIR="./results/monster_toy"
 PLACEHOLDER_TOKEN="<monster-toy>"
-INITIALIZER_TOKEN="toy"
+INITIALIZER_TOKEN="monster"
 LEARNABLE_PROPERTY="object"  # or "style"
 
 # Training hyperparameters
 RESOLUTION=1024
 TRAIN_BATCH_SIZE=1
 GRADIENT_ACCUMULATION_STEPS=4
-MAX_TRAIN_STEPS=3000
+MAX_TRAIN_STEPS=5000
 LEARNING_RATE=1e-4
 LR_SCHEDULER="constant"
 LR_WARMUP_STEPS=0
 NUM_VECTORS=1
 SAVE_STEPS=500
 CHECKPOINTING_STEPS=500
-CHECKPOINTS_TOTAL_LIMIT=2
+CHECKPOINTS_TOTAL_LIMIT=1
 REPEATS=100
 
 # Advanced options (uncomment to use)
@@ -41,7 +41,7 @@ REPEATS=100
 # Validation settings
 VALIDATION_PROMPT="A photo of $PLACEHOLDER_TOKEN"
 NUM_VALIDATION_IMAGES=4
-VALIDATION_STEPS=5
+VALIDATION_STEPS=250
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
@@ -79,12 +79,12 @@ accelerate launch textual_inversion_sdxl.py \
   --output_dir="$OUTPUT_DIR" \
   --checkpointing_steps=$CHECKPOINTING_STEPS \
   --checkpoints_total_limit=$CHECKPOINTS_TOTAL_LIMIT \
-  --mixed_precision="fp16" \
+  --mixed_precision="bf16" \
   --validation_prompt="$VALIDATION_PROMPT" \
   --num_validation_images=$NUM_VALIDATION_IMAGES \
   --validation_steps=$VALIDATION_STEPS \
   --seed=42 \
-  # --report_to="wandb" \
+  --report_to="wandb" \
 
 # Optional flags (uncomment to use):
 # --center_crop \

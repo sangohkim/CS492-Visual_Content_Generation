@@ -133,7 +133,6 @@ def log_validation(
         f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
         f" {args.validation_prompt}."
     )
-    # Create pipeline without specifying torch_dtype to preserve individual component dtypes
     pipeline = DiffusionPipeline.from_pretrained(
         args.pretrained_model_name_or_path,
         text_encoder=accelerator.unwrap_model(text_encoder_1),
@@ -145,14 +144,10 @@ def log_validation(
         safety_checker=None,
         revision=args.revision,
         variant=args.variant,
+        torch_dtype=weight_dtype,
     )
     pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
     pipeline = pipeline.to(accelerator.device)
-
-    pipeline.unet.to(dtype=weight_dtype)
-
-    pipeline.vae.to(dtype=torch.float32)
-    
     pipeline.set_progress_bar_config(disable=True)
 
     # run inference
@@ -551,41 +546,16 @@ class TextualInversionDataset(Dataset):
         placeholder_string = self.placeholder_token
         text = random.choice(self.templates).format(placeholder_string)
 
-        # Store original size for SDXL conditioning
         example["original_size"] = (image.height, image.width)
 
-        # Resize to a slightly larger size first to allow for cropping
-        # This ensures we maintain aspect ratio before final crop
-        if not self.center_crop:
-            # For random crop, resize the smaller edge to self.size
-            if image.width < image.height:
-                new_width = self.size
-                new_height = int(self.size * image.height / image.width)
-            else:
-                new_height = self.size
-                new_width = int(self.size * image.width / image.height)
-            image = image.resize((new_width, new_height), resample=self.interpolation)
-        else:
-            # For center crop, resize directly if aspect ratio is square
-            # Otherwise, resize the smaller dimension to self.size
-            if image.width != image.height:
-                if image.width < image.height:
-                    new_width = self.size
-                    new_height = int(self.size * image.height / image.width)
-                else:
-                    new_height = self.size
-                    new_width = int(self.size * image.width / image.height)
-                image = image.resize((new_width, new_height), resample=self.interpolation)
-            else:
-                image = image.resize((self.size, self.size), resample=self.interpolation)
+        image = image.resize((self.size, self.size), resample=self.interpolation)
 
-        # Now crop to the exact target size
         if self.center_crop:
             y1 = max(0, int(round((image.height - self.size) / 2.0)))
             x1 = max(0, int(round((image.width - self.size) / 2.0)))
-            image = transforms.functional.crop(image, y1, x1, self.size, self.size)
+            image = self.crop(image)
         else:
-            y1, x1, h, w = transforms.RandomCrop.get_params(image, (self.size, self.size))
+            y1, x1, h, w = self.crop.get_params(image, (self.size, self.size))
             image = transforms.functional.crop(image, y1, x1, h, w)
 
         example["crop_top_left"] = (y1, x1)
@@ -858,15 +828,10 @@ def main():
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    # Move unet to device and cast to weight_dtype
+    # Move vae and unet and text_encoder_2 to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
-    
-    # IMPORTANT: Keep VAE in float32 to avoid NaN in latents
-    # VAE is very sensitive to FP16 precision and can produce NaN values
-    vae.to(accelerator.device, dtype=torch.float32)
-    
-    # Keep text encoders in float32 for training the embeddings
-    # Only cast to weight_dtype during forward pass if needed
+    vae.to(accelerator.device, dtype=weight_dtype)
+    text_encoder_2.to(accelerator.device, dtype=weight_dtype)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
@@ -937,15 +902,6 @@ def main():
     # keep original embeddings as reference
     orig_embeds_params = accelerator.unwrap_model(text_encoder_1).get_input_embeddings().weight.data.clone()
     orig_embeds_params_2 = accelerator.unwrap_model(text_encoder_2).get_input_embeddings().weight.data.clone()
-    
-    # Check if the initialized embeddings are valid
-    if torch.isnan(orig_embeds_params[placeholder_token_ids]).any():
-        raise ValueError("Initial embeddings contain NaN values!")
-    if torch.isnan(orig_embeds_params_2[placeholder_token_ids_2]).any():
-        raise ValueError("Initial embeddings for text_encoder_2 contain NaN values!")
-    
-    logger.info(f"Placeholder token IDs: {placeholder_token_ids}")
-    logger.info(f"Placeholder token IDs 2: {placeholder_token_ids_2}")
 
     for epoch in range(first_epoch, args.num_train_epochs):
         text_encoder_1.train()
@@ -953,27 +909,8 @@ def main():
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate([text_encoder_1, text_encoder_2]):
                 # Convert images to latent space
-                # Use float32 for VAE to avoid numerical instability
-                pixel_values = batch["pixel_values"].to(accelerator.device, dtype=torch.float32)
-                
-                # Check if input images are valid
-                if torch.isnan(pixel_values).any() or torch.isinf(pixel_values).any():
-                    logger.warning(f"Invalid pixel values detected at step {global_step}. Skipping batch.")
-                    continue
-                
-                latents = vae.encode(pixel_values).latent_dist.sample().detach()
+                latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample().detach()
                 latents = latents * vae.config.scaling_factor
-                
-                # Convert latents to weight_dtype for unet
-                latents = latents.to(dtype=weight_dtype)
-                
-                # Check if latents are valid
-                if torch.isnan(latents).any() or torch.isinf(latents).any():
-                    logger.error(f"NaN/Inf in latents after VAE encoding at step {global_step}!")
-                    logger.error(f"Pixel values - min: {pixel_values.min():.4f}, max: {pixel_values.max():.4f}")
-                    logger.error(f"VAE scaling factor: {vae.config.scaling_factor}")
-                    optimizer.zero_grad()
-                    continue
 
                 # Sample noise that we'll add to the latents
                 noise = torch.randn_like(latents)
@@ -987,50 +924,29 @@ def main():
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                encoder_output_1 = text_encoder_1(batch["input_ids_1"], output_hidden_states=True)
-                encoder_hidden_states_1 = encoder_output_1.hidden_states[-2].to(dtype=weight_dtype)
-                
-                # Check encoder 1 outputs
-                if torch.isnan(encoder_hidden_states_1).any() or torch.isinf(encoder_hidden_states_1).any():
-                    logger.error(f"NaN/Inf in text_encoder_1 output at step {global_step}!")
-                    logger.error(f"Input IDs: {batch['input_ids_1'][:, :10]}")  # First 10 tokens
-                    # Check the embeddings themselves
-                    current_embeds = text_encoder_1.get_input_embeddings().weight[placeholder_token_ids]
-                    logger.error(f"Placeholder embeddings contain NaN: {torch.isnan(current_embeds).any().item()}")
-                    logger.error(f"Placeholder embeddings - min: {current_embeds.min():.4f}, max: {current_embeds.max():.4f}")
-                    optimizer.zero_grad()
-                    continue
-                
+                encoder_hidden_states_1 = (
+                    text_encoder_1(batch["input_ids_1"], output_hidden_states=True)
+                    .hidden_states[-2]
+                    .to(dtype=weight_dtype)
+                )
                 encoder_output_2 = text_encoder_2(batch["input_ids_2"], output_hidden_states=True)
                 encoder_hidden_states_2 = encoder_output_2.hidden_states[-2].to(dtype=weight_dtype)
-                
-                # Check encoder 2 outputs
-                if torch.isnan(encoder_hidden_states_2).any() or torch.isinf(encoder_hidden_states_2).any():
-                    logger.error(f"NaN/Inf in text_encoder_2 output at step {global_step}!")
-                    current_embeds_2 = text_encoder_2.get_input_embeddings().weight[placeholder_token_ids_2]
-                    logger.error(f"Placeholder embeddings 2 contain NaN: {torch.isnan(current_embeds_2).any().item()}")
-                    logger.error(f"Placeholder embeddings 2 - min: {current_embeds_2.min():.4f}, max: {current_embeds_2.max():.4f}")
-                    optimizer.zero_grad()
-                    continue
-                
-                # Use actual batch size instead of args.train_batch_size
-                actual_batch_size = batch["pixel_values"].shape[0]
                 original_size = [
                     (batch["original_size"][0][i].item(), batch["original_size"][1][i].item())
-                    for i in range(actual_batch_size)
+                    for i in range(args.train_batch_size)
                 ]
                 crop_top_left = [
                     (batch["crop_top_left"][0][i].item(), batch["crop_top_left"][1][i].item())
-                    for i in range(actual_batch_size)
+                    for i in range(args.train_batch_size)
                 ]
                 target_size = (args.resolution, args.resolution)
                 add_time_ids = torch.cat(
                     [
                         torch.tensor(original_size[i] + crop_top_left[i] + target_size)
-                        for i in range(actual_batch_size)
+                        for i in range(args.train_batch_size)
                     ]
                 ).to(accelerator.device, dtype=weight_dtype)
-                added_cond_kwargs = {"text_embeds": encoder_output_2[0].to(dtype=weight_dtype), "time_ids": add_time_ids}
+                added_cond_kwargs = {"text_embeds": encoder_output_2[0], "time_ids": add_time_ids}
                 encoder_hidden_states = torch.cat([encoder_hidden_states_1, encoder_hidden_states_2], dim=-1)
 
                 # Predict the noise residual
@@ -1047,39 +963,8 @@ def main():
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
                 loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
-                
-                # Detailed NaN debugging
-                if torch.isnan(loss) or torch.isinf(loss):
-                    logger.error(f"=" * 80)
-                    logger.error(f"NaN/Inf loss detected at step {global_step}!")
-                    logger.error(f"Latents - min: {latents.min().item():.4f}, max: {latents.max().item():.4f}, mean: {latents.mean().item():.4f}")
-                    logger.error(f"Latents contains NaN: {torch.isnan(latents).any().item()}")
-                    logger.error(f"Latents contains Inf: {torch.isinf(latents).any().item()}")
-                    logger.error(f"Model pred - min: {model_pred.min().item():.4f}, max: {model_pred.max().item():.4f}, mean: {model_pred.mean().item():.4f}")
-                    logger.error(f"Model pred contains NaN: {torch.isnan(model_pred).any().item()}")
-                    logger.error(f"Model pred contains Inf: {torch.isinf(model_pred).any().item()}")
-                    logger.error(f"Target - min: {target.min().item():.4f}, max: {target.max().item():.4f}, mean: {target.mean().item():.4f}")
-                    logger.error(f"Target contains NaN: {torch.isnan(target).any().item()}")
-                    logger.error(f"Target contains Inf: {torch.isinf(target).any().item()}")
-                    logger.error(f"Encoder hidden states 1 contains NaN: {torch.isnan(encoder_hidden_states_1).any().item()}")
-                    logger.error(f"Encoder hidden states 2 contains NaN: {torch.isnan(encoder_hidden_states_2).any().item()}")
-                    logger.error(f"Text embeds contains NaN: {torch.isnan(encoder_output_2[0]).any().item()}")
-                    logger.error(f"Timesteps: {timesteps.tolist()}")
-                    logger.error(f"=" * 80)
-                    optimizer.zero_grad()
-                    continue
 
                 accelerator.backward(loss)
-                
-                # Clip gradients to prevent exploding gradients
-                if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(
-                        [
-                            text_encoder_1.text_model.embeddings.token_embedding.weight,
-                            text_encoder_2.text_model.embeddings.token_embedding.weight,
-                        ],
-                        max_norm=1.0
-                    )
 
                 optimizer.step()
                 lr_scheduler.step()

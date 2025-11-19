@@ -5,20 +5,32 @@
 
 # Configuration
 PRETRAINED_MODEL="stabilityai/stable-diffusion-xl-base-1.0"
-LEARNED_EMBEDS_PATH="./output/learned_embeds.safetensors"
-LEARNED_EMBEDS_2_PATH="./output/learned_embeds_2.safetensors"
+LEARNED_EMBEDS_PATH="./results/monster_toy/learned_embeds-steps-5000.safetensors"
+LEARNED_EMBEDS_2_PATH="./results/monster_toy/learned_embeds_2-steps-5000.safetensors"
 OUTPUT_DIR="./generated_images"
-PLACEHOLDER_TOKEN="<your-concept>"
+PLACEHOLDER_TOKEN="<monster-toy>"
 
 # Generation parameters
-PROMPT="A photo of $PLACEHOLDER_TOKEN in a beautiful garden"
+PROMPT="Adorable corgi dressed as $PLACEHOLDER_TOKEN"
 NEGATIVE_PROMPT=""
 NUM_IMAGES=5
-NUM_INFERENCE_STEPS=50
+NUM_INFERENCE_STEPS=25
 GUIDANCE_SCALE=7.5
 HEIGHT=1024
 WIDTH=1024
 SEED=42
+
+echo "=========================================="
+echo "Textual Inversion SDXL Inference"
+echo "=========================================="
+echo "Model: $PRETRAINED_MODEL"
+echo "Text Encoder Embeddings: $LEARNED_EMBEDS_PATH"
+echo "Text Encoder 2 Embeddings: $LEARNED_EMBEDS_2_PATH"
+echo "Placeholder Token: $PLACEHOLDER_TOKEN"
+echo "Prompt: $PROMPT"
+echo "Output Directory: $OUTPUT_DIR"
+echo "=========================================="
+echo ""
 
 # Run inference using the Python script
 python inference.py \
@@ -39,4 +51,6 @@ python inference.py \
   --use_safetensors
 
 echo ""
+echo "=========================================="
 echo "Done! Check the generated images in: $OUTPUT_DIR"
+echo "=========================================="
