@@ -5,13 +5,13 @@
 
 # Configuration
 PRETRAINED_MODEL="stabilityai/stable-diffusion-xl-base-1.0"
-LEARNED_EMBEDS_PATH="./results/monster_toy/learned_embeds-steps-5000.safetensors"
-LEARNED_EMBEDS_2_PATH="./results/monster_toy/learned_embeds_2-steps-5000.safetensors"
+LEARNED_EMBEDS_PATH="./results/monster_toy-archived/learned_embeds-steps-5000.safetensors"
+LEARNED_EMBEDS_2_PATH="./results/monster_toy-archived/learned_embeds_2-steps-5000.safetensors"
 OUTPUT_DIR="./generated_images"
 PLACEHOLDER_TOKEN="<monster-toy>"
 
 # Generation parameters
-PROMPT="Adorable corgi dressed as $PLACEHOLDER_TOKEN"
+PROMPT="A $PLACEHOLDER_TOKEN playing in a futuristic city, highly detailed, vibrant colors, comics style"
 NEGATIVE_PROMPT=""
 NUM_IMAGES=5
 NUM_INFERENCE_STEPS=25
@@ -48,7 +48,8 @@ python inference.py \
   --width=$WIDTH \
   --seed=$SEED \
   --variant="fp16" \
-  --use_safetensors
+  --use_safetensors \
+  --batch_size 4
 
 echo ""
 echo "=========================================="
