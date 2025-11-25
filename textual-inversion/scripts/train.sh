@@ -5,7 +5,7 @@
 
 # Configuration
 PRETRAINED_MODEL="stabilityai/stable-diffusion-xl-base-1.0"
-TRAIN_DATA_DIR="./dataset/nupjuki-cropped/train"
+TRAIN_DATA_DIR="/root/sangoh/CS492-Visual_Content_Generation/textual-inversion/dataset/nupjuki-new_data/train"
 OUTPUT_DIR="./results/nupjuki"
 PLACEHOLDER_TOKEN="<nupjuki>"
 INITIALIZER_TOKEN="plush"
@@ -22,7 +22,7 @@ LR_WARMUP_STEPS=0
 NUM_VECTORS=1
 SAVE_STEPS=500
 CHECKPOINTING_STEPS=500
-CHECKPOINTS_TOTAL_LIMIT=1
+CHECKPOINTS_TOTAL_LIMIT=3
 REPEATS=100
 
 # Advanced options (uncomment to use)

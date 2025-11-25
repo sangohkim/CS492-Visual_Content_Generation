@@ -1,14 +1,14 @@
 MODEL_NAME="stabilityai/stable-diffusion-xl-base-1.0"
 VAE_NAME="madebyollin/sdxl-vae-fp16-fix"
-DATA_ROOT="/root/sangoh/CS492-Visual_Content_Generation/dreambooth/dataset/nupjuki-new_data"
+DATA_ROOT="/root/sangoh/CS492-Visual_Content_Generation/dreambooth/dataset/nupjuki-new_data-color-no_sks-filtered"
 OUTPUT_ROOT="./results/dreambooth-sdxl"
 
 SEED=42
 BATCH_SIZE=1
-NUM_TRAIN_EPOCHS=250
+NUM_TRAIN_EPOCHS=500
 CKPT_STEP=50
 LR=1e-4
-GRAD_ACC_STEPS=8
+GRAD_ACC_STEPS=4
 
 accelerate launch train_text_to_image_lora_sdxl.py \
   --pretrained_model_name_or_path=$MODEL_NAME \
@@ -27,5 +27,5 @@ accelerate launch train_text_to_image_lora_sdxl.py \
   --seed=$SEED \
   --output_dir="$OUTPUT_ROOT/$(basename $DATA_ROOT)" \
   --validation_steps 25 \
-  --validation_prompt="a sks plush running in the jungle" \
+  --validation_prompt="a blue plush running in the jungle" \
   --report_to="wandb" \
