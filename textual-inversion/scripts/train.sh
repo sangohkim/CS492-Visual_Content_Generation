@@ -5,16 +5,16 @@
 
 # Configuration
 PRETRAINED_MODEL="stabilityai/stable-diffusion-xl-base-1.0"
-TRAIN_DATA_DIR="./dataset/monster_toy/train"
-OUTPUT_DIR="./results/monster_toy"
-PLACEHOLDER_TOKEN="<monster-toy>"
-INITIALIZER_TOKEN="monster"
+TRAIN_DATA_DIR="./dataset/nupjuki-cropped/train"
+OUTPUT_DIR="./results/nupjuki"
+PLACEHOLDER_TOKEN="<nupjuki>"
+INITIALIZER_TOKEN="plush"
 LEARNABLE_PROPERTY="object"  # or "style"
 
 # Training hyperparameters
 RESOLUTION=1024
 TRAIN_BATCH_SIZE=1
-GRADIENT_ACCUMULATION_STEPS=4
+GRADIENT_ACCUMULATION_STEPS=8
 MAX_TRAIN_STEPS=5000
 LEARNING_RATE=1e-4
 LR_SCHEDULER="constant"
@@ -39,7 +39,7 @@ REPEATS=100
 # LR_NUM_CYCLES=1
 
 # Validation settings
-VALIDATION_PROMPT="A photo of $PLACEHOLDER_TOKEN"
+VALIDATION_PROMPT="$PLACEHOLDER_TOKEN"
 NUM_VALIDATION_IMAGES=4
 VALIDATION_STEPS=250
 
