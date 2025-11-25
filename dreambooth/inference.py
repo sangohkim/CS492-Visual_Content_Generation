@@ -3,13 +3,16 @@ from diffusers import DiffusionPipeline
 import torch
 from pathlib import Path
 import re
+import os
 
 # ===== 설정 =====
 base_model_id = "stabilityai/stable-diffusion-xl-base-1.0"
-output_dir = "./inference_outputs"
 
 # 체크포인트 디렉토리에서 자동으로 모든 체크포인트 찾기
 checkpoint_base_dir = Path("/root/sangoh/CS492-Visual_Content_Generation/dreambooth/results/dreambooth-sdxl/nupjuki-cropped")
+output_dir = os.path.join("./inference_outputs", checkpoint_base_dir.name)
+
+os.makedirs(output_dir, exist_ok=True)
 
 # checkpoint-N 형식의 모든 디렉토리 찾기
 checkpoint_dirs = sorted(
