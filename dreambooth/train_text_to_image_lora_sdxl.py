@@ -62,6 +62,10 @@ from diffusers.utils import (
 from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_card
 from diffusers.utils.import_utils import is_torch_npu_available, is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
+try:
+    import yaml
+except Exception:
+    yaml = None
 
 
 if is_wandb_available():
@@ -259,7 +263,7 @@ def parse_args(input_args=None):
         help="Number of images that should be generated during validation with `validation_prompt`.",
     )
     parser.add_argument(
-        "--validation_epochs",
+        "--validation_steps",
         type=int,
         default=1,
         help=(
@@ -524,6 +528,50 @@ def parse_args(input_args=None):
     return args
 
 
+def _serialize_arg_value(v):
+    from pathlib import Path
+
+    if isinstance(v, (str, int, float, bool)) or v is None:
+        return v
+    if isinstance(v, Path):
+        return str(v)
+    if isinstance(v, (list, tuple)):
+        return [_serialize_arg_value(x) for x in v]
+    if isinstance(v, dict):
+        return {str(k): _serialize_arg_value(val) for k, val in v.items()}
+    # numpy scalars
+    try:
+        import numpy as _np
+
+        if isinstance(v, _np.generic):
+            return v.item()
+    except Exception:
+        pass
+    # fallback to string
+    return str(v)
+
+
+def save_args_yaml(args, output_dir: str, filename: str = "training_args.yaml"):
+    """Save argparse Namespace to a YAML file under output_dir.
+
+    Falls back to JSON-like text if PyYAML is not available.
+    """
+    args_dict = vars(args).copy()
+    ser = {k: _serialize_arg_value(v) for k, v in args_dict.items()}
+    out_path = os.path.join(output_dir, filename)
+    try:
+        if yaml is None:
+            raise RuntimeError("PyYAML not available")
+        with open(out_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(ser, f, sort_keys=False, allow_unicode=True)
+    except Exception:
+        # fallback: write a simple key: value lines
+        with open(out_path, "w", encoding="utf-8") as f:
+            for k, v in ser.items():
+                f.write(f"{k}: {v}\n")
+
+
+
 DATASET_NAME_MAPPING = {
     "lambdalabs/naruto-blip-captions": ("image", "text"),
 }
@@ -618,6 +666,11 @@ def main(args):
     if accelerator.is_main_process:
         if args.output_dir is not None:
             os.makedirs(args.output_dir, exist_ok=True)
+            # record current args to YAML for reproducibility
+            try:
+                save_args_yaml(args, args.output_dir)
+            except Exception as e:
+                logger.warning(f"Failed to write training args yaml: {e}")
 
         if args.push_to_hub:
             repo_id = create_repo(
@@ -1381,7 +1434,7 @@ def main(args):
                 break
 
         if accelerator.is_main_process:
-            if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
+            if args.validation_prompt is not None and global_step % args.validation_steps == 0:
                 # create pipeline
                 pipeline = StableDiffusionXLPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,

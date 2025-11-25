@@ -9,7 +9,7 @@ base_model_id = "stabilityai/stable-diffusion-xl-base-1.0"
 output_dir = "./inference_outputs"
 
 # 체크포인트 디렉토리에서 자동으로 모든 체크포인트 찾기
-checkpoint_base_dir = Path("/root/sangoh/CS492-Visual_Content_Generation/results/dreambooth-sdxl/monster_toy")
+checkpoint_base_dir = Path("/root/sangoh/CS492-Visual_Content_Generation/dreambooth/results/dreambooth-sdxl/nupjuki-cropped")
 
 # checkpoint-N 형식의 모든 디렉토리 찾기
 checkpoint_dirs = sorted(
@@ -26,11 +26,11 @@ for i, path in enumerate(lora_model_ids, 1):
 
 # 프롬프트 리스트
 prompts = [
-    "A sks monster running in the jungle",
-    "A sks monster wearing a hat",
-    "A sks monster jumping on the moon",
-    "A sks monster playing with a ball in the park",
-    "A sks monster standing on a beach at sunset",
+    "a sks plush running in the jungle",
+    "a sks plush wearing a hat",
+    "a blue sks plush jumping on the moon",
+    "a blue sks plush playing with a ball in the park",
+    "a sks plush standing on a beach at sunset",
 ]
 
 # 추론 설정
