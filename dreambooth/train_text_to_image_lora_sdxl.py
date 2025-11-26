@@ -142,7 +142,7 @@ def log_validation(
 
     # run inference
     generator = torch.Generator(device=accelerator.device).manual_seed(args.seed) if args.seed is not None else None
-    pipeline_args = {"prompt": args.validation_prompt}
+    pipeline_args = {"prompt": args.validation_prompt, "negative_prompt": "photograph, deformed, glitch, noisy, realistic, stock photo, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"}
     if torch.backends.mps.is_available():
         autocast_ctx = nullcontext()
     else:

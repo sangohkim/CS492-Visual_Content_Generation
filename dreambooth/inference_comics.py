@@ -9,7 +9,7 @@ import os
 base_model_id = "stabilityai/stable-diffusion-xl-base-1.0"
 
 # 체크포인트 디렉토리에서 자동으로 모든 체크포인트 찾기
-checkpoint_base_dir = Path("/root/sangoh/CS492-Visual_Content_Generation/dreambooth/results/dreambooth-sdxl/nupjuki-new_data-color-lognormal")
+checkpoint_base_dir = Path("/root/sangoh/CS492-Visual_Content_Generation/dreambooth/results/dreambooth-sdxl/nupjuki-new_data-color")
 output_dir = os.path.join("./inference_outputs", checkpoint_base_dir.name)
 
 os.makedirs(output_dir, exist_ok=True)
@@ -29,16 +29,16 @@ for i, path in enumerate(lora_model_ids, 1):
 
 # 프롬프트 리스트
 prompts = [
-    "a blue sks plush reading a newspaper",
-    "a blue sks plush running in the jungle",
-    "a blue sks plush standing in a cave filled with gold",
-    "a blue sks plush driving a car filled with gold",
-    "a blue sks plush lying on a pile of gold",
-    "a blue sks plush standing on a beach at sunset"
+    "a blue sks plush reading a newspaper. graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
+    "a blue sks plush running in the jungle. graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
+    "a blue sks plush standing in a cave filled with gold. graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
+    "a blue sks plush driving a car filled with gold. graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
+    "a blue sks plush lying on a pile of gold. graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
+    "a blue sks plush standing on a beach at sunset. graphic illustration, comic art, graphic novel art, vibrant, highly detailed"
 ]
 
 # 추론 설정
-num_inference_steps = 25
+num_inference_steps = 50
 seed = 42
 
 # ===== 파이프라인 초기화 =====
@@ -70,6 +70,7 @@ for lora_idx, lora_path in enumerate(lora_model_ids):
         # 이미지 생성
         image = pipe(
             prompt=prompt,
+            negative_prompt="photograph, deformed, glitch, noisy, realistic, stock photo, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
             num_inference_steps=num_inference_steps,
             generator=generator
         ).images[0]
