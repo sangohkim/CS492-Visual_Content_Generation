@@ -16,6 +16,7 @@ OUTPUT_BASE="./outputs_db/run_${TIMESTAMP}"
 
 # Path to your DreamBooth LoRA checkpoint directory
 LORA_PATH=$1
+SEED=42
 
 echo "Using LoRA checkpoint path: $LORA_PATH"
 
@@ -25,27 +26,8 @@ if [ ! -d "$LORA_PATH" ]; then
     exit 1
 fi
 
-# ===========================================
-# Example 1: Simple comic with DreamBooth LoRA (4 panels)
-# ===========================================
-# echo "=========================================="
-# echo "Example 1: Simple 4-panel comic with DreamBooth LoRA"
-# echo "=========================================="
-# python Comic_Generation_dreambooth.py \
-#   --general_prompt "A sks monster, cute toy style" \
-#   --prompts "running in the jungle" "wearing a hat" "jumping on the moon" "playing with a ball in the park" \
-#   --lora_path "$LORA_PATH" \
-#   --output_dir ./outputs/example1_simple_dreambooth \
-#   --seed 42
-
-# ===========================================
-# Example 2: Action comic with DreamBooth LoRA
-# ===========================================
-echo ""
-echo "=========================================="
-echo "Example 2: Action comic with DreamBooth LoRA"
-echo "=========================================="
-
+# 변경 가능
+# negative prompt 변경하려면 README.md 참고
 prompts=(
   "reading a newspaper"
   "running in the jungle"
@@ -55,6 +37,7 @@ prompts=(
   "standing on a beach at sunset"
 )
 
+# 아래 커맨드는 변경 불가
 python Comic_Generation_dreambooth.py \
   --general_prompt "a blue sks plush" \
   --prompts "${prompts[@]}" \
@@ -70,59 +53,4 @@ python Comic_Generation_dreambooth.py \
   --output_dir "${OUTPUT_BASE}" \
   --use_sequential_offload \
   --use_attention_slicing \
-  --seed 42
-
-# ===========================================
-# Example 3: Daily life comic with DreamBooth LoRA
-# ===========================================
-# echo ""
-# echo "=========================================="
-# echo "Example 3: Daily life comic with DreamBooth LoRA"
-# echo "=========================================="
-# python Comic_Generation_dreambooth.py \
-#   --general_prompt "A sks monster, casual clothing" \
-#   --prompts "drinking morning coffee" "walking in the park" "reading a book on a bench" "watching the sunset" \
-#   --lora_path "$LORA_PATH" \
-#   --style "Photographic" \
-#   --id_length 3 \
-#   --sa32 0.5 \
-#   --sa64 0.5 \
-#   --num_steps 50 \
-#   --guidance_scale 7.0 \
-#   --height 1024 \
-#   --width 1024 \
-#   --use_sequential_offload \
-#   --use_attention_slicing \
-#   --output_dir "${OUTPUT_BASE}_daily" \
-#   --seed 42
-
-# ===========================================
-# Example 4: Anime style comic with DreamBooth LoRA
-# ===========================================
-# echo ""
-# echo "=========================================="
-# echo "Example 4: Anime style comic with DreamBooth LoRA"
-# echo "=========================================="
-# python Comic_Generation_dreambooth.py \
-#   --general_prompt "A sks monster, anime style, vibrant colors" \
-#   --prompts "training with a wooden sword" "meditating under a waterfall" "sparring with a rival" "achieving inner peace" \
-#   --lora_path "$LORA_PATH" \
-#   --style "Anime" \
-#   --id_length 3 \
-#   --sa32 0.6 \
-#   --sa64 0.6 \
-#   --num_steps 50 \
-#   --guidance_scale 6.0 \
-#   --height 1024 \
-#   --width 1024 \
-#   --use_sequential_offload \
-#   --use_attention_slicing \
-#   --use_vae_slicing \
-#   --output_dir "${OUTPUT_BASE}_anime" \
-#   --seed 42
-
-echo ""
-echo "=========================================="
-echo "All examples completed!"
-echo "Results saved to: ${OUTPUT_BASE}"
-echo "=========================================="
+  --seed $SEED
