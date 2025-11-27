@@ -5,7 +5,12 @@ wandb*
 class_images*
 inference_outputs*
 
-./StoryDiffusion/output*
+StoryDiffusion/output*
+StoryDiffusion/outputs/
+StoryDiffusion/outputs_db-color-no_sks/
+StoryDiffusion/outputs_db-color/
+StoryDiffusion/outputs_db/
+StoryDiffusion/outputs_ti/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
