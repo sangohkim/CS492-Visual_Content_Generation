@@ -1,5 +1,7 @@
-# Installation
+# CS492-Visual_Content_Generation
 
-# Inference
-## DreamBooth
-## DreamBooth + StoryDiffusion
+## Installation
+
+## Inference
+### DreamBooth
+### DreamBooth + StoryDiffusion
