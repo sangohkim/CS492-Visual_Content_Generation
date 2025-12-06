@@ -1,5 +1,4 @@
 diffusers*
-results*
 wandb*
 class_images*
 inference_outputs*
