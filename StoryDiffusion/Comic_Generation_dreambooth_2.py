@@ -461,7 +461,7 @@ def main():
     )
     # Prepare prompts
     generator = torch.Generator(device="cuda").manual_seed(args.seed)
-    full_prompts = [f"{args.general_prompt}, {prompt}" for prompt in args.prompts]
+    full_prompts = [f"{prompt}" for prompt in args.prompts]
     id_prompts = full_prompts[:id_length]
     real_prompts = full_prompts[id_length:]
     # Generate identity images
@@ -511,18 +511,18 @@ def main():
         img.save(os.path.join(args.output_dir, f"panel_{idx:02d}.png"))
     print(f"✓ Saved {len(total_images)} individual images")
     # Create comic layout
-    print("\nCreating comic layout...")
-    try:
-        font = ImageFont.truetype(args.font_path, args.font_size)
-    except:
-        print(f"⚠ Could not load font from {args.font_path}, using default")
-        font = ImageFont.load_default()
-    comics = get_comic_4panel(total_images, captions=args.prompts, font=font, pad_image=Image.open("/root/sangoh/CS492-Visual_Content_Generation/StoryDiffusion/images/pad_images.png"))
-    # Save comics
-    for idx, comic in enumerate(comics):
-        comic_path = os.path.join(args.output_dir, f"comic_page_{idx:02d}.png")
-        comic.save(comic_path)
-        print(f"✓ Saved comic page: {comic_path}")
+    # print("\nCreating comic layout...")
+    # try:
+    #     font = ImageFont.truetype(args.font_path, args.font_size)
+    # except:
+    #     print(f"⚠ Could not load font from {args.font_path}, using default")
+    #     font = ImageFont.load_default()
+    # comics = get_comic_4panel(total_images, captions=args.prompts, font=font, pad_image=Image.open("/root/sangoh/CS492-Visual_Content_Generation/StoryDiffusion/images/pad_images.png"))
+    # # Save comics
+    # for idx, comic in enumerate(comics):
+    #     comic_path = os.path.join(args.output_dir, f"comic_page_{idx:02d}.png")
+    #     comic.save(comic_path)
+    #     print(f"✓ Saved comic page: {comic_path}")
     print("\n" + "=" * 80)
     print("Comic generation completed successfully!")
     print(f"Output directory: {args.output_dir}")

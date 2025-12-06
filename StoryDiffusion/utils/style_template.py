@@ -45,6 +45,11 @@ style_list = [
         "negative_prompt": "photograph, deformed, glitch, noisy, realistic, stock photo, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
     },
     {
+        "name": "Comic book storydiffv3",
+        "prompt": "{prompt}. graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
+        "negative_prompt": "cloth, mouth, photograph, deformed, glitch, noisy, realistic, stock photo, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
+    },
+    {
         "name": "Comic book sangoh color",  # Modify negative prompt not to make black-and-white images
         "prompt": "comic {prompt} . graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
         "negative_prompt": "monochrome, black and white, grayscale, photograph, deformed, glitch, noisy, realistic, stock photo, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",

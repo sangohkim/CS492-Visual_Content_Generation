@@ -5,6 +5,10 @@ wandb*
 class_images*
 inference_outputs*
 
+*inference_outputs
+inference*
+paper_figures*
+
 StoryDiffusion/output*
 StoryDiffusion/outputs/
 StoryDiffusion/outputs_db-color-no_sks/

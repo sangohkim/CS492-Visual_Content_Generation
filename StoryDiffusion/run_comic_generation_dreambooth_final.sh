@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 
 # Generate timestamp for output directory
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-OUTPUT_BASE="./outputs_JW/run_${TIMESTAMP}"
+OUTPUT_BASE="../inference_outputs_final"
 
 # ===========================================
 # Configuration - Modify these paths
@@ -29,27 +29,24 @@ fi
 # 변경 가능
 # negative prompt 변경하려면 README.md 참고
 prompts=(
-  "a blue sks plush running across an enchanted grassland."
-  "a blue sks plush standing in a lush forest illuminated by fireflies."
-  "a blue sks plush standing in a tranquil Japanese-style garden."
-  "a blue sks plush riding a rainbow wave."
-  "a blue sks plush reading a glowing blueprint inside a workshop."
-  "a close-up of a treasure map with mystical symbols on an ancient parchment, lying on a wooden table in the workshop."
-  "a blue sks plush running through a dense alien jungle, following a glowing path on the ground."
-  "a magical broomstick was founded in ancient stone ruins, skeleton guardians standing watch nearby."
-  "fireworks made by a blue sks plush make skeleton guardians ran away."
-  "a blue sks plush riding a magical broomstick high above the clouds."
+  "a blue sks plush, standing in a lush forest illuminated by fireflies"
+  "a blue sks plush, walking in a lush forest illuminated by fireflies"
+  "cars driving in a lush forest illuminated by fireflies, whole view",
+  "a blue sks plush running in a lush forest"
+  "a giant spider in a lush forest illuminated by fireflies"
+  "a house in a lush forest illuminated by fireflies"
+  "a room, filled with gold, ancient artifacts, and treasure chests"
 )
 
 # 아래 커맨드는 변경 불가
-python Comic_Generation_dreambooth.py \
+python Comic_Generation_dreambooth_2.py \
   --general_prompt "" \
   --prompts "${prompts[@]}" \
   --lora_path "$LORA_PATH" \
   --style "Comic book storydiffv2" \
-  --id_length 4 \
-  --sa32 0.75 \
-  --sa64 0.75 \
+  --id_length 2 \
+  --sa32 0.5 \
+  --sa64 0.5 \
   --num_steps 50 \
   --guidance_scale 5.0 \
   --height 1024 \
