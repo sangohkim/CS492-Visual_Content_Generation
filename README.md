@@ -4,7 +4,7 @@
 Tested at 20GB GPU VRAM, 96GB disk space server.
 ### 1. Python Environment
 ```
-conda env create -f requirements.yml
+conda env create -f requirements.yaml
 ```
 #### Alternative
 ```
