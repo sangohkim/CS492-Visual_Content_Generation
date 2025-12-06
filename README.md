@@ -8,8 +8,8 @@ conda env create -f requirements.yml
 ```
 #### Alternative
 ```
-conda create -n <env_name> python=3.10 -y
-conda activate <env_name>
+conda create -n sdxl python=3.10 -y
+conda activate sdxl
 pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
 pip install diffusers==0.35.2 accelerate==1.11.0 huggingface-hub==0.36.0
 ```
