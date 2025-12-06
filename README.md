@@ -1,5 +1,7 @@
 # CS492-Visual_Content_Generation
 
+![image](demo/comics_final_3.png)
+
 ## How to Reproduce
 Tested at 20GB GPU VRAM, 96GB disk space server.
 ### 1. Python Environment
